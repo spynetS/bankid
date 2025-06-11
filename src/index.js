@@ -43,30 +43,52 @@ async function pollStatus(orderRef) {
 }
 
 // === Routes ===
+app.post("/cancel-auth", async (req, res) => {
+  const { orderRef } = req.body;
+  try {
+    await axios.post(
+      "https://appapi2.test.bankid.com/rp/v5.1/cancel",
+      {
+        orderRef,
+      },
+      { httpsAgent: httpsAgent },
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err.response?.data || err.message);
+    res.status(500).json({ error: "Cancel auth failed" });
+  }
+});
 
 // Start authentication (call this from frontend)
 app.post("/start-auth", async (req, res) => {
-  console.log("test");
+  const { personalNumber } = req.body;
+  let endUserIp =
+    req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+  if (["::1", "127.0.0.1", "::ffff:127.0.0.1"].includes(endUserIp)) {
+    endUserIp = "192.168.1.4"; // placeholder for test
+  }
+
   try {
-    const { personalNumber } = req.body;
-    let endUserIp =
-      req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+    const response = await axios.post(
+      "https://appapi2.test.bankid.com/rp/v5.1/auth",
+      {
+        personalNumber,
+        endUserIp,
+      },
+      {
+        httpsAgent: httpsAgent,
+      },
+    );
 
-    // If local IP, replace with a dummy valid IP (ONLY FOR TESTING)
-    if (
-      endUserIp === "::1" ||
-      endUserIp === "127.0.0.1" ||
-      endUserIp === "::ffff:127.0.0.1"
-    ) {
-      endUserIp = "192.168.1.1"; // Or any valid IPv4 you want to test with
-    }
-    console.log(endUserIp);
+    const { orderRef, qrStartToken, qrStartSecret } = response.data;
+    const orderTime = Date.now(); // in ms
 
-    const authResponse = await startAuth(personalNumber, endUserIp);
-    res.json(authResponse);
+    res.json({ orderRef, qrStartToken, qrStartSecret, orderTime });
   } catch (err) {
-    console.error("start-auth error:", err.response?.data || err.message);
-    res.status(500).json({ error: "Failed to start BankID authentication" });
+    console.error(err.response?.data || err.message);
+    res.status(500).json({ error: "Start auth failed" });
   }
 });
 

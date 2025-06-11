@@ -16,58 +16,101 @@
   <button id="pollStatusBtn">Poll Status</button>
 
   <pre id="output" style="background:#eee; padding:10px; margin-top:20px;"></pre>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+
+  <canvas id="qrCanvas"></canvas>
 
   <script>
+   function startQRUpdater({ qrStartToken, qrStartSecret, orderTime }) {
+	   const qrCanvas = document.getElementById('qrCanvas');
+	   const secret = qrStartSecret;
+	   const token = qrStartToken;
+	   const orderEpoch = orderTime;
+
+	   const update = () => {
+		   const qrTime = Math.floor((Date.now() - orderEpoch) / 1000).toString();
+
+		   // HMAC-SHA256
+		   const key = new TextEncoder().encode(secret);
+		   const msg = new TextEncoder().encode(qrTime);
+
+		   window.crypto.subtle.importKey(
+			   'raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+		   ).then(cryptoKey => {
+			   return window.crypto.subtle.sign('HMAC', cryptoKey, msg);
+		   }).then(signature => {
+			   const hashHex = [...new Uint8Array(signature)]
+				   .map(b => b.toString(16).padStart(2, '0')).join('');
+
+			   const qrData = `bankid.${token}.${qrTime}.${hashHex}`;
+			   QRCode.toCanvas(qrCanvas, qrData, { scale: 5 });
+		   });
+	   };
+
+	   update(); // run once immediately
+	   return setInterval(update, 1000);
+   }
+
    const startAuthBtn = document.getElementById('startAuthBtn');
    const pollStatusBtn = document.getElementById('pollStatusBtn');
    const output = document.getElementById('output');
 
+
+
    startAuthBtn.onclick = async () => {
-       const personalNumber = document.getElementById('personalNumber').value;
-       if (!personalNumber) {
-           alert('Please enter personal number');
-           return;
-       }
+	   const personalNumber = document.getElementById('personalNumber').value;
+	   if (!personalNumber) {
+		   alert('Please enter personal number');
+		   return;
+	   }
 
-       output.textContent = 'Starting auth...';
+	   output.textContent = 'Starting auth...';
 
-       try {
-           const res = await fetch('/start-auth', {
+	   try {
+		   const res = await fetch('/start-auth', {
 			   method: 'POST',
 			   headers: { 'Content-Type': 'application/json' },
 			   body: JSON.stringify({ personalNumber }),
-           });
-           const data = await res.json();
-           output.textContent = JSON.stringify(data, null, 2);
+		   });
+		   const data = await res.json();
+		   output.textContent = JSON.stringify(data, null, 2);
 
-           if (data.orderRef) {
+		   if (data.orderRef) {
 			   document.getElementById('orderRef').value = data.orderRef;
-           }
-       } catch (err) {
-           output.textContent = 'Error: ' + err.message;
-       }
+		   }
+
+		   if (data.qrStartToken && data.qrStartSecret && data.orderTime) {
+			   startQRUpdater({
+				   qrStartToken: data.qrStartToken,
+				   qrStartSecret: data.qrStartSecret,
+				   orderTime: data.orderTime
+			   });
+		   }
+	   } catch (err) {
+		   output.textContent = 'Error: ' + err.message;
+	   }
    };
 
    pollStatusBtn.onclick = async () => {
-       const orderRef = document.getElementById('orderRef').value;
-       if (!orderRef) {
-           alert('Please enter orderRef');
-           return;
-       }
+	   const orderRef = document.getElementById('orderRef').value;
+	   if (!orderRef) {
+		   alert('Please enter orderRef');
+		   return;
+	   }
 
-       output.textContent = 'Polling status...';
+	   output.textContent = 'Polling status...';
 
-       try {
-           const res = await fetch('/poll-status', {
+	   try {
+		   const res = await fetch('/poll-status', {
 			   method: 'POST',
 			   headers: { 'Content-Type': 'application/json' },
 			   body: JSON.stringify({ orderRef }),
-           });
-           const data = await res.json();
-           output.textContent = JSON.stringify(data, null, 2);
-       } catch (err) {
-           output.textContent = 'Error: ' + err.message;
-       }
+		   });
+		   const data = await res.json();
+		   output.textContent = JSON.stringify(data, null, 2);
+	   } catch (err) {
+		   output.textContent = 'Error: ' + err.message;
+	   }
    };
   </script>
 </body>
