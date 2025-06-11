@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BankID Test</title>
+</head>
+<body>
+  <h1>BankID Authentication Test</h1>
+
+  <label for="personalNumber">Personal Number:</label>
+  <input type="text" id="personalNumber" placeholder="YYYYMMDDXXXX" />
+  <button id="startAuthBtn">Start Auth</button>
+
+  <h2>Poll Status</h2>
+  <label for="orderRef">Order Ref:</label>
+  <input type="text" id="orderRef" />
+  <button id="pollStatusBtn">Poll Status</button>
+
+  <pre id="output" style="background:#eee; padding:10px; margin-top:20px;"></pre>
+
+  <script>
+   const startAuthBtn = document.getElementById('startAuthBtn');
+   const pollStatusBtn = document.getElementById('pollStatusBtn');
+   const output = document.getElementById('output');
+
+   startAuthBtn.onclick = async () => {
+       const personalNumber = document.getElementById('personalNumber').value;
+       if (!personalNumber) {
+           alert('Please enter personal number');
+           return;
+       }
+
+       output.textContent = 'Starting auth...';
+
+       try {
+           const res = await fetch('/start-auth', {
+			   method: 'POST',
+			   headers: { 'Content-Type': 'application/json' },
+			   body: JSON.stringify({ personalNumber }),
+           });
+           const data = await res.json();
+           output.textContent = JSON.stringify(data, null, 2);
+
+           if (data.orderRef) {
+			   document.getElementById('orderRef').value = data.orderRef;
+           }
+       } catch (err) {
+           output.textContent = 'Error: ' + err.message;
+       }
+   };
+
+   pollStatusBtn.onclick = async () => {
+       const orderRef = document.getElementById('orderRef').value;
+       if (!orderRef) {
+           alert('Please enter orderRef');
+           return;
+       }
+
+       output.textContent = 'Polling status...';
+
+       try {
+           const res = await fetch('/poll-status', {
+			   method: 'POST',
+			   headers: { 'Content-Type': 'application/json' },
+			   body: JSON.stringify({ orderRef }),
+           });
+           const data = await res.json();
+           output.textContent = JSON.stringify(data, null, 2);
+       } catch (err) {
+           output.textContent = 'Error: ' + err.message;
+       }
+   };
+  </script>
+</body>
+</html>
